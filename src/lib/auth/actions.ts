@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { DEFAULT_LOGIN_REDIRECT, safeNextPath } from "@/lib/auth/routes";
 import { signInSchema, signUpSchema } from "@/lib/auth/validation";
+import { backendEnabled } from "@/lib/preview/mode";
 import { getSiteUrl } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -50,6 +51,7 @@ function authErrorMessage(error: AuthError): string {
 }
 
 export async function signUp(_prev: SignUpState, formData: FormData): Promise<SignUpState> {
+  if (!backendEnabled) redirect(DEFAULT_LOGIN_REDIRECT);
   const raw = {
     username: String(formData.get("username") ?? ""),
     email: String(formData.get("email") ?? ""),
@@ -90,6 +92,7 @@ export async function signUp(_prev: SignUpState, formData: FormData): Promise<Si
 }
 
 export async function signIn(_prev: SignInState, formData: FormData): Promise<SignInState> {
+  if (!backendEnabled) redirect(safeNextPath(formData.get("next")));
   const raw = {
     email: String(formData.get("email") ?? ""),
     password: String(formData.get("password") ?? ""),
@@ -112,6 +115,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
 }
 
 export async function signOut() {
+  if (!backendEnabled) redirect("/");
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath("/", "layout");

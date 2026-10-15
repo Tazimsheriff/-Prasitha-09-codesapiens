@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { getCurrentProfile, getCurrentUser } from "@/lib/auth/session";
+import { backendEnabled } from "@/lib/preview/mode";
 import { Container } from "./container";
 import { Logo } from "./logo";
 import { SiteNav, SiteNavFallback, type NavViewer } from "./site-nav";
@@ -11,7 +12,12 @@ async function ViewerNav() {
   if (user) {
     const profile = await getCurrentProfile();
     const p = profile?.status === "ok" ? profile.profile : null;
-    viewer = { username: p?.username ?? null, email: user.email, isAdmin: p?.role === "admin" };
+    viewer = {
+      username: p?.username ?? null,
+      email: user.email,
+      isAdmin: p?.role === "admin",
+      preview: !backendEnabled,
+    };
   }
   return <SiteNav viewer={viewer} />;
 }

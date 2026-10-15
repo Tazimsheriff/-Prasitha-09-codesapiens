@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/session";
+import { backendEnabled } from "@/lib/preview/mode";
 import { createClient } from "@/lib/supabase/server";
 import { parseProfileForm, type ProfileFieldErrors } from "./validation";
 
@@ -14,6 +15,7 @@ export async function updateProfile(_prev: UpdateProfileState, formData: FormDat
   // Re-verify the session inside the action; never trust the page that rendered the form.
   const user = await getCurrentUser();
   if (!user) return { status: "error", message: "Your session has expired. Please log in again." };
+  if (!backendEnabled) return { status: "error", message: "This preview has no database, so changes aren't saved." };
 
   const parsed = parseProfileForm(formData);
   if (!parsed.success) {
@@ -61,6 +63,7 @@ export type RegenerateLinkState =
 export async function regeneratePublicLink(): Promise<RegenerateLinkState> {
   const user = await getCurrentUser();
   if (!user) return { status: "error", message: "Your session has expired. Please log in again." };
+  if (!backendEnabled) return { status: "error", message: "This preview has no database, so the link stays as it is." };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("regenerate_public_slug");

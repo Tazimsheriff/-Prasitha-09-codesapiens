@@ -1,10 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
+import { previewOwnProfile } from "@/lib/preview/content";
+import { backendEnabled } from "@/lib/preview/mode";
 import { publicProfileUrl } from "@/lib/profile/public-url";
 import { qrPng, qrSvg } from "@/lib/profile/qr";
 import { createClient } from "@/lib/supabase/server";
 
 const noStore = { "Cache-Control": "private, no-store" };
+
+async function loadOwnSlug(userId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("username, public_slug")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error || !data) return null;
+  return data;
+}
 
 /**
  * GET /profile/qr?format=png|svg — downloads the signed-in user's own QR code.
@@ -19,13 +32,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "format must be png or svg" }, { status: 400, headers: noStore });
   }
 
-  const supabase = await createClient();
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("username, public_slug")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (error || !profile) {
+  const profile = backendEnabled ? await loadOwnSlug(user.id) : previewOwnProfile;
+  if (!profile) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404, headers: noStore });
   }
 
