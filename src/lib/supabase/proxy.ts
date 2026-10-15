@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthPage, isProtectedPath, DEFAULT_LOGIN_REDIRECT } from "@/lib/auth/routes";
 import type { Database } from "@/types/database";
+import { backendEnabled } from "@/lib/preview/mode";
 import { getSupabaseEnv } from "./env";
 
 /**
@@ -12,6 +13,8 @@ import { getSupabaseEnv } from "./env";
  * This is NOT the security boundary — pages, Server Actions and RLS all re-check.
  */
 export async function updateSession(request: NextRequest) {
+  if (!backendEnabled) return NextResponse.next({ request });
+
   const { url, publishableKey } = getSupabaseEnv();
   let response = NextResponse.next({ request });
 

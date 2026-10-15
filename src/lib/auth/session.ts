@@ -2,6 +2,8 @@ import "server-only";
 import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import { cache } from "react";
+import { previewProfile, previewUser } from "@/lib/preview/content";
+import { backendEnabled } from "@/lib/preview/mode";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/types/database";
 
@@ -25,6 +27,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   // Session checks compare token expiry with the current time, so they must run
   // at request time, never during prerendering.
   await connection();
+  if (!backendEnabled) return previewUser;
   const supabase = await createClient();
   const { data, error } = await supabase.auth.getClaims();
   const claims = data?.claims;
@@ -36,6 +39,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
 export const getCurrentProfile = cache(async (): Promise<ProfileResult | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
+  if (!backendEnabled) return { status: "ok", profile: previewProfile };
 
   const supabase = await createClient();
   const { data, error } = await supabase

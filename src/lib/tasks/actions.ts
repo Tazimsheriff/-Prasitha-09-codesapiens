@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/session";
+import { backendEnabled } from "@/lib/preview/mode";
 import { createClient } from "@/lib/supabase/server";
 import { EVIDENCE_BUCKET, checkEvidenceFile, evidencePath } from "./evidence";
 import { parseSubmissionFields, type SubmissionFieldErrors } from "./validation";
@@ -28,6 +29,7 @@ const err = (message: string, fieldErrors?: SubmissionFieldErrors): SubmitState 
 export async function submitTask(_prev: SubmitState, formData: FormData): Promise<SubmitState> {
   const user = await getCurrentUser();
   if (!user) return err("Your session has expired. Please log in again.");
+  if (!backendEnabled) return err("This preview has no database, so submissions aren't saved.");
 
   const fields = parseSubmissionFields(formData);
   if (!fields.success) return err("Please fix the highlighted fields.", fields.fieldErrors);

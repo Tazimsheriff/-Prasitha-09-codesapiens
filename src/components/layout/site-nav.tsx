@@ -9,7 +9,7 @@ import { signOut } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 
 /** What the header needs to know about the viewer. Display only — never used for authorization. */
-export type NavViewer = { username: string | null; email: string | null; isAdmin: boolean } | null;
+export type NavViewer = { username: string | null; email: string | null; isAdmin: boolean; preview?: boolean } | null;
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -88,7 +88,13 @@ export function SiteNav({ viewer }: { viewer: NavViewer }) {
                 @{who}
               </Link>
             )}
-            <LogoutButton />
+            {viewer.preview ? (
+              <span className="border-[3px] border-ink bg-sun px-2 py-1 font-mono text-xs font-bold uppercase tracking-wider text-on-accent">
+                Preview
+              </span>
+            ) : (
+              <LogoutButton />
+            )}
           </>
         ) : (
           <>
@@ -153,7 +159,11 @@ export function SiteNav({ viewer }: { viewer: NavViewer }) {
             {viewer ? (
               <div className="mt-2 flex flex-col gap-3">
                 {who && <p className="truncate font-mono text-sm text-subtle">Signed in as @{who}</p>}
-                <LogoutButton block />
+                {viewer.preview ? (
+                  <p className="font-mono text-xs font-bold uppercase tracking-wider text-subtle">Preview — database off</p>
+                ) : (
+                  <LogoutButton block />
+                )}
               </div>
             ) : (
               <div className="mt-2 grid grid-cols-2 gap-3">

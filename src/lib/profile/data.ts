@@ -2,6 +2,8 @@ import "server-only";
 import { connection } from "next/server";
 import { cache } from "react";
 import { requireUser } from "@/lib/auth/session";
+import { previewOwnProfile, previewPublicProfile } from "@/lib/preview/content";
+import { backendEnabled } from "@/lib/preview/mode";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 import type { Json } from "@/types/database";
@@ -30,6 +32,10 @@ export type OwnProfileResult =
  * Redirects to /login when signed out. Only ever reads the caller's own row.
  */
 export const getOwnProfile = cache(async (): Promise<OwnProfileResult> => {
+  if (!backendEnabled) {
+    await connection();
+    return { status: "ok", profile: previewOwnProfile };
+  }
   const user = await requireUser("/profile");
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -69,6 +75,7 @@ export type PublicProfile = {
 export const getPublicProfile = cache(async (slug: string): Promise<PublicProfile | null> => {
   await connection(); // live data: always fetched at request time
   if (!isValidPublicSlug(slug)) return null;
+  if (!backendEnabled) return previewPublicProfile(slug);
   const { data, error } = await createPublicClient().rpc("get_public_profile", { p_slug: slug });
   if (error) {
     console.error("Failed to load public profile", error.code);

@@ -1,6 +1,8 @@
 import "server-only";
 import { connection } from "next/server";
 import { requireUser } from "@/lib/auth/session";
+import { previewCoinSummary, previewLeaderboard, previewLedger } from "@/lib/preview/content";
+import { backendEnabled } from "@/lib/preview/mode";
 import { createPublicClient } from "@/lib/supabase/public";
 import { createClient } from "@/lib/supabase/server";
 import type { LedgerRow } from "./ledger";
@@ -25,6 +27,10 @@ function failed(error: { code?: string }, what: string): { ok: false; schemaMiss
 
 /** The signed-in user's balance, lifetime earnings and rank — computed by the database from the ledger. */
 export async function getMyCoinSummary(nextPath = "/wallet"): Promise<Loaded<CoinSummary>> {
+  if (!backendEnabled) {
+    await connection();
+    return { ok: true, data: previewCoinSummary };
+  }
   await requireUser(nextPath);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_my_coin_summary");
@@ -47,6 +53,10 @@ export const LEDGER_PAGE_SIZE = 50;
 
 /** The signed-in user's own ledger rows (RLS: own rows only), newest first. */
 export async function listMyTransactions(page: number): Promise<Loaded<{ rows: LedgerRow[]; hasMore: boolean }>> {
+  if (!backendEnabled) {
+    await connection();
+    return { ok: true, data: { rows: page === 1 ? previewLedger : [], hasMore: false } };
+  }
   const user = await requireUser("/wallet");
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -105,6 +115,7 @@ export type LeaderboardEntry = {
 /** Public leaderboard via the allow-listed function, read as the anonymous role. */
 export async function getLeaderboard(limit = 50): Promise<Loaded<LeaderboardEntry[]>> {
   await connection(); // live ranking: computed from the ledger on every request
+  if (!backendEnabled) return { ok: true, data: previewLeaderboard.slice(0, limit) };
   try {
     const { data, error } = await createPublicClient().rpc("get_leaderboard", { p_limit: limit });
     if (error || !data) return failed(error ?? {}, "leaderboard");

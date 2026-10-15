@@ -1,6 +1,9 @@
 import "server-only";
+import { connection } from "next/server";
 import { cache } from "react";
 import { getCurrentUser, requireUser } from "@/lib/auth/session";
+import { previewSubmissions, previewTasks } from "@/lib/preview/content";
+import { backendEnabled } from "@/lib/preview/mode";
 import { createClient } from "@/lib/supabase/server";
 import type { SubmissionStatus } from "@/types/database";
 
@@ -57,6 +60,10 @@ function toMySubmission(row: {
 
 /** Active tasks (RLS also hides drafts/archived from non-admins). */
 export const listActiveTasks = cache(async (): Promise<DataResult<TaskSummary[]>> => {
+  if (!backendEnabled) {
+    await connection();
+    return { status: "ok", data: previewTasks };
+  }
   await requireUser("/tasks");
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -78,6 +85,11 @@ export async function getOpenChallengesForViewer(
 ): Promise<{ signedIn: false } | { signedIn: true; result: DataResult<TaskSummary[]> }> {
   const user = await getCurrentUser();
   if (!user) return { signedIn: false };
+  if (!backendEnabled) {
+    const now = Date.now();
+    const open = previewTasks.filter((task) => !task.deadline || Date.parse(task.deadline) > now);
+    return { signedIn: true, result: { status: "ok", data: open.slice(0, limit) } };
+  }
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tasks")
@@ -93,6 +105,10 @@ export async function getOpenChallengesForViewer(
 
 /** One active task, or null if it doesn't exist / isn't visible to this user. */
 export const getActiveTask = cache(async (taskId: string): Promise<DataResult<TaskSummary | null>> => {
+  if (!backendEnabled) {
+    await connection();
+    return { status: "ok", data: previewTasks.find((task) => task.id === taskId) ?? null };
+  }
   await requireUser(`/tasks/${taskId}`);
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -107,6 +123,11 @@ export const getActiveTask = cache(async (taskId: string): Promise<DataResult<Ta
 
 /** The signed-in user's own submissions (optionally for one task), newest first. */
 export const listMySubmissions = cache(async (taskId?: string): Promise<DataResult<MySubmission[]>> => {
+  if (!backendEnabled) {
+    await connection();
+    const data = taskId ? previewSubmissions.filter((submission) => submission.task_id === taskId) : previewSubmissions;
+    return { status: "ok", data };
+  }
   const user = await requireUser(taskId ? `/tasks/${taskId}` : "/submissions");
   const supabase = await createClient();
   // Explicit user filter: admins can read everyone's rows via RLS, but this
@@ -125,6 +146,13 @@ export const listMySubmissions = cache(async (taskId?: string): Promise<DataResu
 /** Titles for a set of task ids (any status the user can see), for history views. */
 export async function getTaskTitles(taskIds: string[]): Promise<Map<string, { title: string; reward_coins: number }>> {
   if (taskIds.length === 0) return new Map();
+  if (!backendEnabled) {
+    return new Map(
+      previewTasks
+        .filter((task) => taskIds.includes(task.id))
+        .map((task) => [task.id, { title: task.title, reward_coins: task.reward_coins }]),
+    );
+  }
   const supabase = await createClient();
   const { data, error } = await supabase.from("tasks").select("id, title, reward_coins").in("id", taskIds);
   if (error) {
