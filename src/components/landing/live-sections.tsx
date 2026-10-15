@@ -85,9 +85,18 @@ const podiumStyles = [
 export async function LeaderboardPreview() {
   const board = await getLeaderboard(5);
   if (!board.ok) {
+    if (board.unreachable) {
+      return (
+        <Alert tone="info" title="Leaderboard not connected">
+          Live standings appear here once the arena database is connected.
+        </Alert>
+      );
+    }
     return (
-      <Alert tone="danger" title="Leaderboard unavailable">
-        We couldn&apos;t load the leaderboard right now. Please refresh the page.
+      <Alert tone={board.schemaMissing ? "warning" : "danger"} title="Leaderboard unavailable">
+        {board.schemaMissing
+          ? "The database is missing the latest coin changes. Apply migration 6 (see the README)."
+          : "We couldn't load the leaderboard right now. Please refresh the page."}
       </Alert>
     );
   }

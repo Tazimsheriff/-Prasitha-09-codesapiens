@@ -57,10 +57,15 @@ async function Board() {
   if (!board.ok) {
     return (
       <Container className="py-12">
-        <Alert tone={board.schemaMissing ? "warning" : "danger"} title="Leaderboard unavailable">
-          {board.schemaMissing
-            ? "The database is missing the latest coin changes. Apply migration 6 (see the README)."
-            : "We couldn't load the leaderboard. Please refresh the page."}
+        <Alert
+          tone={board.unreachable ? "info" : board.schemaMissing ? "warning" : "danger"}
+          title={board.unreachable ? "Leaderboard not connected" : "Leaderboard unavailable"}
+        >
+          {board.unreachable
+            ? "Live standings appear here once the arena database is connected."
+            : board.schemaMissing
+              ? "The database is missing the latest coin changes. Apply migration 6 (see the README)."
+              : "We couldn't load the leaderboard. Please refresh the page."}
         </Alert>
       </Container>
     );

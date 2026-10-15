@@ -13,12 +13,14 @@ export type CoinSummary = {
   is_public: boolean;
 };
 
-export type Loaded<T> = { ok: true; data: T } | { ok: false; schemaMissing: boolean };
+export type Loaded<T> = { ok: true; data: T } | { ok: false; schemaMissing: boolean; unreachable?: boolean };
 
-function failed(error: { code?: string }, what: string): { ok: false; schemaMissing: boolean } {
+function failed(error: { code?: string }, what: string): { ok: false; schemaMissing: boolean; unreachable: boolean } {
   const schemaMissing = error.code === "PGRST202" || error.code === "PGRST205" || error.code === "42703";
-  if (!schemaMissing) console.error(`coins: failed to load ${what}`, error.code);
-  return { ok: false, schemaMissing };
+  // No Postgres code means the request never reached the database (missing or unreachable Supabase).
+  const unreachable = !error.code;
+  if (!schemaMissing && !unreachable) console.error(`coins: failed to load ${what}`, error.code);
+  return { ok: false, schemaMissing, unreachable };
 }
 
 /** The signed-in user's balance, lifetime earnings and rank — computed by the database from the ledger. */
@@ -103,17 +105,21 @@ export type LeaderboardEntry = {
 /** Public leaderboard via the allow-listed function, read as the anonymous role. */
 export async function getLeaderboard(limit = 50): Promise<Loaded<LeaderboardEntry[]>> {
   await connection(); // live ranking: computed from the ledger on every request
-  const { data, error } = await createPublicClient().rpc("get_leaderboard", { p_limit: limit });
-  if (error) return failed(error, "leaderboard");
-  return {
-    ok: true,
-    data: data.map((r) => ({
-      leaderboard_rank: Number(r.leaderboard_rank),
-      username: r.username,
-      display_name: r.display_name,
-      public_slug: r.public_slug,
-      lifetime_coins: Number(r.lifetime_coins),
-      approved_tasks: Number(r.approved_tasks),
-    })),
-  };
+  try {
+    const { data, error } = await createPublicClient().rpc("get_leaderboard", { p_limit: limit });
+    if (error || !data) return failed(error ?? {}, "leaderboard");
+    return {
+      ok: true,
+      data: data.map((r) => ({
+        leaderboard_rank: Number(r.leaderboard_rank),
+        username: r.username,
+        display_name: r.display_name,
+        public_slug: r.public_slug,
+        lifetime_coins: Number(r.lifetime_coins),
+        approved_tasks: Number(r.approved_tasks),
+      })),
+    };
+  } catch {
+    return { ok: false, schemaMissing: false, unreachable: true };
+  }
 }
